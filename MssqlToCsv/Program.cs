@@ -1,5 +1,7 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Data.SqlClient;
+using System.Globalization;
 using System.IO;
 using GetPass;
 
@@ -30,11 +32,14 @@ namespace MssqlToCsv
 
                 var command = new SqlCommand(query, conn);
                 var reader = command.ExecuteReader();
+
+                var coltypes = new List<Type>();
                 
                 for (int i = 0; i < reader.FieldCount; i++)
                 {
                     file.Write(reader.GetName(i));
                     file.Write("\t");
+                    coltypes.Add(reader.GetFieldType(i));
                 }
                 file.WriteLine();
                 
@@ -48,7 +53,15 @@ namespace MssqlToCsv
                     {
                         if (!reader.IsDBNull(i))
                         {
-                            file.Write(reader.GetValue(i));
+                            if (coltypes[i] == typeof(DateTime))
+                            {
+                                var dt = reader.GetDateTime(i);
+                                file.Write(dt.ToString("s", CultureInfo.InvariantCulture));
+                            }
+                            else
+                            {
+                                file.Write(reader.GetValue(i));
+                            }
                         }
                         file.Write("\t");
                     }
