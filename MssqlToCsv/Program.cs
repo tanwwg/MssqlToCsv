@@ -9,6 +9,14 @@ namespace MssqlToCsv
 {
     class Program
     {
+        static string cleanup(string s)
+        {
+            return s
+                .Replace("\n", "\\n")
+                .Replace("\r", "\\r")
+                .Replace("\t", "\\t");
+        }
+        
         static int Main(string server, string user, string password, string catalog, string query, string output)
         {
             try
@@ -60,7 +68,7 @@ namespace MssqlToCsv
                             }
                             else
                             {
-                                file.Write(reader.GetValue(i));
+                                file.Write(cleanup(reader.GetValue(i).ToString()));
                             }
                         }
                         file.Write("\t");
