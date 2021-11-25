@@ -4,6 +4,8 @@ using System.Data.SqlClient;
 using System.Globalization;
 using System.IO;
 using GetPass;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace MssqlToCsv
 {
@@ -16,8 +18,83 @@ namespace MssqlToCsv
                 .Replace("\r", "\\r")
                 .Replace("\t", "\\t");
         }
+
+        static void WriteJson(StreamWriter file, SqlDataReader reader, string jsoncol)
+        {
+            file.WriteLine("[");
+
+            var o = new Dictionary<string, object>();
+
+            while (reader.Read())
+            {
+                for (int i = 0; i < reader.FieldCount; i++)
+                {
+                    var col = reader.GetName(i);
+                    if (String.Equals(col, jsoncol, StringComparison.InvariantCultureIgnoreCase))
+                    {
+                        o[col] = JObject.Parse(reader.GetString(i));
+                    }
+                    else
+                    {
+                        o[col] = reader.GetValue(i);
+                    }
+                }
+                file.Write(JsonConvert.SerializeObject(o));
+                file.WriteLine(",");
+            }
+            file.WriteLine("]");
+        }
+
+        static void WriteTsv(StreamWriter file, SqlDataReader reader)
+        {
+            var coltypes = new List<Type>();
+                
+            for (int i = 0; i < reader.FieldCount; i++)
+            {
+                file.Write(reader.GetName(i));
+                file.Write("\t");
+                coltypes.Add(reader.GetFieldType(i));
+            }
+            file.WriteLine();
+                
+            Console.Out.WriteLine("Header written");
+
+            var linecount = 0;
+
+            while (reader.Read())
+            {
+                for (int i = 0; i < reader.FieldCount; i++)
+                {
+                    if (!reader.IsDBNull(i))
+                    {
+                        if (coltypes[i] == typeof(DateTime))
+                        {
+                            var dt = reader.GetDateTime(i);
+                            file.Write(dt.ToString("s", CultureInfo.InvariantCulture));
+                        }
+                        else
+                        {
+                            file.Write(cleanup(reader.GetValue(i).ToString()));
+                        }
+                    }
+                    file.Write("\t");
+                }
+                file.WriteLine();
+
+                linecount += 1;
+                if (linecount % 1000 == 0)
+                {
+                    Console.Out.WriteLine("Written " + linecount);
+                }
+            }
+            file.Close();
+
+            Console.Out.WriteLine("Total written " + linecount);
+        }
         
-        static int Main(string server, string user, string password, string catalog, string query, string output)
+        static int Main(string server, 
+            string user, string password, string catalog, string query, 
+            string output, string jsoncol)
         {
             try
             {
@@ -41,50 +118,17 @@ namespace MssqlToCsv
                 var command = new SqlCommand(query, conn);
                 var reader = command.ExecuteReader();
 
-                var coltypes = new List<Type>();
-                
-                for (int i = 0; i < reader.FieldCount; i++)
+                if (string.IsNullOrWhiteSpace(jsoncol))
                 {
-                    file.Write(reader.GetName(i));
-                    file.Write("\t");
-                    coltypes.Add(reader.GetFieldType(i));
+                    Console.Out.WriteLine("Writing TSV");
+                    WriteTsv(file, reader);
                 }
-                file.WriteLine();
-                
-                Console.Out.WriteLine("Header written");
-
-                var linecount = 0;
-
-                while (reader.Read())
+                else
                 {
-                    for (int i = 0; i < reader.FieldCount; i++)
-                    {
-                        if (!reader.IsDBNull(i))
-                        {
-                            if (coltypes[i] == typeof(DateTime))
-                            {
-                                var dt = reader.GetDateTime(i);
-                                file.Write(dt.ToString("s", CultureInfo.InvariantCulture));
-                            }
-                            else
-                            {
-                                file.Write(cleanup(reader.GetValue(i).ToString()));
-                            }
-                        }
-                        file.Write("\t");
-                    }
-                    file.WriteLine();
-
-                    linecount += 1;
-                    if (linecount % 1000 == 0)
-                    {
-                        Console.Out.WriteLine("Written " + linecount);
-                    }
+                    Console.Out.WriteLine("Writing Json");
+                    WriteJson(file, reader, jsoncol);
                 }
-                file.Close();
 
-                Console.Out.WriteLine("Total written " + linecount);
-                
                 conn.Close();
                 return 0;
             }
