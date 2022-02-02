@@ -25,6 +25,8 @@ namespace MssqlToCsv
 
             var o = new Dictionary<string, object>();
 
+            var isFirstLine = true;
+
             while (reader.Read())
             {
                 for (int i = 0; i < reader.FieldCount; i++)
@@ -39,8 +41,16 @@ namespace MssqlToCsv
                         o[col] = reader.GetValue(i);
                     }
                 }
+
+                if (isFirstLine)
+                {
+                    isFirstLine = false;
+                }
+                else
+                {
+                    file.WriteLine(",");
+                }
                 file.Write(JsonConvert.SerializeObject(o));
-                file.WriteLine(",");
             }
             file.WriteLine("]");
         }
@@ -87,7 +97,6 @@ namespace MssqlToCsv
                     Console.Out.WriteLine("Written " + linecount);
                 }
             }
-            file.Close();
 
             Console.Out.WriteLine("Total written " + linecount);
         }
@@ -129,6 +138,7 @@ namespace MssqlToCsv
                     WriteJson(file, reader, jsoncol);
                 }
 
+                file.Close();
                 conn.Close();
                 return 0;
             }
