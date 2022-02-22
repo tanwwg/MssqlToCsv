@@ -125,6 +125,7 @@ namespace MssqlToCsv
                 var file = new StreamWriter(output);
 
                 var command = new SqlCommand(query, conn);
+                command.CommandTimeout = 120;
                 var reader = command.ExecuteReader();
 
                 if (string.IsNullOrWhiteSpace(jsoncol))
